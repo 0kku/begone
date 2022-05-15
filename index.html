@@ -14,96 +14,390 @@
     }
   </style>
   <script type="module">
-import { reactive, computed, html, css, Component, register, Ref } from "https://code.okku.dev/destiny-ui/v0.7.0/dist/mod.js";
+import {
+  reactive,
+  computed,
+  html,
+  css,
+  Component,
+  register,
+  classNames,
+  attachCSSProperties
+} from "https://code.okku.dev/destiny-ui/v0.7.1/dist/mod.js";
+
+const notImpact = new FontFace(
+  "not_impact",
+  "url('https://code.okku.dev/fonts/not-impact.woff2')"
+);
+const chalkduster = new FontFace(
+  "chalkduster",
+  "url('https://code.okku.dev/fonts/chalkduster.woff2')"
+);
+const operinaRomano = new FontFace(
+  "operina_romano",
+  "url('https://code.okku.dev/fonts/p22-operina-romano.woff2')"
+);
+
+const LINE_SPACING = 0.25;
+
+const ALL_FONTS = [notImpact, chalkduster, operinaRomano];
 
 class AppRoot extends Component {
   #top = reactive("begone");
   #middle = reactive("horny");
   #bottom = reactive("teen");
   #dimensions = reactive(320);
-  #canvas = new Ref;
+  #scaledUpDimensions = this.#dimensions.pipe(dimensions => Math.max(dimensions * 4, 320));
+  #showMetrics = reactive(false);
+  #speckles = reactive(25);
+  #darkMode = reactive(window.matchMedia('(prefers-color-scheme: dark)').matches);
+  #canvasElement = reactive();
+  #canvasContext = this.#canvasElement.pipe(el => el?.getContext('2d'));
+  #offscreenCanvasElement = reactive(document.createElement('canvas'));
+  #offscreenCanvasContext = computed(() => {
+    const dimensions = this.#scaledUpDimensions.value;
+    this.#offscreenCanvasElement.value.height = dimensions;
+    this.#offscreenCanvasElement.value.width = dimensions;
+    return this.#offscreenCanvasElement.value.getContext('2d');
+  });
   #href = reactive("");
-  #hold;
-  
+
   static styles = css`
-    label {
-      display: block;
+    :host {
+      display: flex;
+      flex-flow: row wrap;
+      align-items: flex-start;
+      justify-content: flex-start;
+      gap: 20px;
     }
-    
+
+    .controls {
+      display: flex;
+      flex-flow: column nowrap;
+      gap: 0.75rem;
+    }
+
+    label {
+      display: flex;
+      flex-flow: column;
+      justify-content: flex-start;
+      gap: 0.25rem;
+      min-width: 320px;
+    }
+
     canvas {
       outline: 1px dashed red;
     }
+    
+    /* dark mode */
+    :host-context(.dark-mode) a {
+      color: lightblue;
+    }
+    :host-context(.dark-mode) input {
+      border-color: #ddd;
+      border-style: solid;
+      border-width: 1px;
+      padding: 2px 3px;
+      background-color: #444;
+      color: white;
+    }
   `;
-  
+
   template = html`
-    <label>
-      Size: <input type="number" value=${this.#dimensions} /> (128 = emoji, 320 = stickers)
-    </label>
-    <label>
-      <input type="text" value=${this.#top} /> top
-    </label>
-    <label>
-      <input type="text" value=${this.#middle} /> middle
-    </label>
-    <label>
-      <input type="text" value=${this.#bottom} /> bottom
-    </label>
+    <div class="controls">
+      <label>
+        Size:
+        <input type="number" value=${this.#dimensions} />
+        (128 = emoji, 320 = stickers)
+      </label>
+      <label>
+        Top:
+        <input type="text" value=${this.#top} />
+      </label>
+      <label>
+        Middle:
+        <input type="text" value=${this.#middle} />
+      </label>
+      <label>
+        Bottom:
+        <input type="text" value=${this.#bottom} />
+      </label>
+      <label>
+        # of Speckles:
+        <input type="number" prop:valueAsNumber=${this.#speckles} />
+      </label>
+      <label>
+        <span>
+          <input type="checkbox" prop:checked=${this.#showMetrics} />
+          Show text metrics
+        </span>
+      </label>
+      <label>
+        <span>
+          <input type="checkbox" prop:checked=${this.#darkMode} />
+          Dark mode
+        </span>
+      </label>
+      <a
+        href=${this.#href}
+        download=${computed`${this.#top}_${this.#middle}_${this.#bottom}.png`}
+      >
+        💾 Save
+      </a>
+      <p><i>Code credit: Cassie</i></p>
+    </div>
     <canvas
       width=${this.#dimensions}
       height=${this.#dimensions}
-      destiny:ref=${this.#canvas}
+      destiny:ref=${this.#canvasElement}
     />
-    <a
-      href=${this.#href}
-      download=${computed`${this.#top}_${this.#middle}_${this.#bottom}.png`}
-    >💾 Save</a>
   `;
-  
-  async connectedCallback () {
-    const canvas = await this.#canvas;
-    const context = canvas.getContext("2d");
 
-    this.#hold = computed(() => {
-      const diameter = this.#dimensions.value;
-      const radius = diameter / 2;
-      context.clearRect(0, 0, diameter, diameter);
-      context.textAlign = "center";
+  async connectedCallback() {
+    computed(() => {
+      document.body.className = this.#darkMode.value ? 'dark-mode' : '';
+    }, {dependents: [this]});
 
-      // TODO: font should be ???
-      context.font = `${diameter * 0.24}px serif`;
-      context.textBaseline = "top";
-      context.fillStyle = "#fecbfe"
-      context.fillText(
-        this.#top.value.toLocaleUpperCase(),
-        radius, 0,
-      );
-      // TODO: font should be https://de.ffonts.net/Chalkduster.font?text=HORNY
-      context.font = `${diameter * 0.24}px serif`;
-      context.textBaseline = "middle";
-      context.fillStyle = "#9898fd";
-      context.fillText(
-        this.#middle.value.toLocaleUpperCase(),
-        radius, radius,
-      );
-      // TOOD: font should be https://discord.com/channels/172018499005317120/729466633877454869/879462179202564136
-      context.font = `${diameter * 0.24}px serif`;
-      context.textBaseline = "bottom";
-      context.fillStyle = "#fd3232";
-      context.fillText(
-        this.#bottom.value.toLocaleUpperCase(),
-        radius, diameter,
-      );
+    await Promise.all(ALL_FONTS.map((font) => font.load()));
+
+    ALL_FONTS.forEach((font) => document.fonts.add(font));
+
+    computed(() => {
+      const offscreenContext = this.#offscreenCanvasContext.value;
+      const context = this.#canvasContext.value;
       
-      this.#href.value = (
-        canvas
-        .toDataURL("image/png")
-        .replace("image/png", "image/octet-stream")
+      if (!offscreenContext || !context) {
+        return;
+      }
+
+      const diameter = this.#dimensions.value;
+      const offscreenDiameter = this.#scaledUpDimensions.value;
+      const top = this.#top.value.toLocaleUpperCase();
+      const middle = this.#middle.value.toLocaleUpperCase();
+      let bottom = this.#bottom.value;
+      if ([...bottom].every((char) => char !== char.toLocaleUpperCase())) {
+        bottom = bottom.toLocaleUpperCase();
+      }
+      
+      const showMetrics = this.#showMetrics.value;
+      const speckles = this.#speckles.value;
+
+      context.clearRect(0, 0, diameter, diameter);
+      offscreenContext.clearRect(0, 0, offscreenDiameter, offscreenDiameter);
+      offscreenContext.textAlign = "center";
+
+      drawLines(
+        offscreenContext,
+        {
+          top,
+          middle,
+          bottom,
+        },
+        {
+          diameter: offscreenDiameter,
+          showMetrics,
+          speckles,
+        }
       );
-    });
+
+      context.drawImage(offscreenContext.canvas, 0, 0, diameter, diameter);
+
+      this.#href.value = context.canvas
+        .toDataURL("image/png")
+        .replace("image/png", "image/octet-stream");
+    }, {dependents: [this]});
   }
 }
 
-register(AppRoot);    
+register(AppRoot);
+
+function drawLines(context, lines, { diameter, showMetrics, speckles }) {
+  const radius = diameter / 2;
+  let fontSize = diameter * 0.24;
+
+  let metrics;
+  let lineHeights;
+  let lineSpacing;
+  let totalContentHeight;
+
+  ({ metrics } = measureMetrics(context, fontSize, lines));
+
+  // first, adjust font size such that the width of the largest line fits neatly within the canvas
+  let widthFactor = Infinity;
+  for (const metric of metrics) {
+    widthFactor = Math.min(widthFactor, diameter / metric.width);
+  }
+  fontSize *= widthFactor;
+
+  ({ metrics, lineHeights, totalContentHeight } = measureMetrics(
+    context,
+    fontSize,
+    lines
+  ));
+  // if the content is too big, also adjust the font size to compensate.
+  const heightFactor = Math.min(1, diameter / totalContentHeight);
+  fontSize *= heightFactor;
+
+  ({ metrics, lineSpacing, lineHeights, totalContentHeight } = measureMetrics(
+    context,
+    fontSize,
+    {
+      ...lines,
+      bottom: 'Pa',
+    }
+  ));
+
+  const verticalMargin = (diameter - totalContentHeight) / 2;
+
+  // we're good to draw now!
+  context.textBaseline = "middle";
+  let yPosition = verticalMargin + metrics[0].actualBoundingBoxAscent;
+  setTopFontStyles(context, fontSize);
+  context.fillText(lines.top, radius, yPosition);
+  if (showMetrics) {
+    drawMetrics(context, diameter, yPosition, metrics[0]);
+  }
+  speckleRect(context, speckles, {
+    x: radius - metrics[0].width / 2,
+    y: verticalMargin,
+    width: metrics[0].width,
+    height: lineHeights[0],
+  });
+
+  yPosition +=
+    metrics[0].actualBoundingBoxDescent +
+    lineSpacing +
+    metrics[1].actualBoundingBoxAscent;
+  setMiddleFontStyles(context, fontSize);
+  context.fillText(lines.middle, radius, yPosition);
+  if (showMetrics) {
+    drawMetrics(context, diameter, yPosition, metrics[1]);
+  }
+
+  yPosition +=
+    metrics[1].actualBoundingBoxDescent +
+    lineSpacing +
+    metrics[2].actualBoundingBoxAscent;
+  setBottomFontStyles(context, fontSize);
+  context.fillText(lines.bottom, radius, yPosition);
+  if (showMetrics) {
+    drawMetrics(context, diameter, yPosition, metrics[2]);
+  }
+}
+
+function speckleRect(context, speckles, { x, y, width, height }) {
+  // pick four points to center the speckle effect
+  // for each of these points, select some number of points to remove colour data from
+  // also pick a maximum radius somewhere around 5% - 15% of the rectangle
+  const speckleCentres =
+      Array.from({length: speckles}, () => getRandomPoint({ x, y, width, height }));
+
+  const specklePoints = [];
+  for (const {x, y} of speckleCentres) {
+    const numberOfPoints = rand(30, 51) | 0;
+    const maxRadius = rand(0.05, 0.15) * Math.max(width, height);
+    specklePoints.push(
+      ...Array.from({ length: numberOfPoints }, () =>
+        getRandomPointInCircle({ x, y, radius: maxRadius })
+      )
+    );
+  }
+  
+  const minSpeckleSize = .5;
+  const maxSpeckleSize = .025 * Math.min(width, height);
+  
+  for (const {x, y} of specklePoints) {
+    // clear a randomly small rectangle in each dimension
+    const width = rand(minSpeckleSize, maxSpeckleSize);
+    const height = rand(minSpeckleSize, maxSpeckleSize);
+    context.clearRect(x, y, width, height);
+  }
+}
+
+function getRandomPoint({ x, y, width, height }) {
+  return { x: rand(x, x + width), y: rand(y, y + height) };
+}
+
+// f(x) = x - 2 sqrt(x) + 1
+function weightDistribution(val) {
+  return val - 2 * Math.sqrt(val) + 1
+}
+
+function getRandomPointInCircle({ x, y, radius }) {
+  const angle = rand(0, 2 * Math.PI);
+  const dist = weightDistribution(rand(0, 1)) * radius;
+
+  return { x: x + dist * Math.cos(angle), y: y + dist * Math.sin(angle) };
+}
+
+function rand(min, max) {
+  return Math.random() * (max - min) + min;
+}
+
+function measureMetrics(context, fontSize, { top, middle, bottom }) {
+  const metrics = [];
+
+  context.textBaseline = "middle";
+  // for each line, measure the initial size of the text to be rendered.
+  setTopFontStyles(context, fontSize);
+  metrics.push(context.measureText(top));
+  setMiddleFontStyles(context, fontSize);
+  metrics.push(context.measureText(middle));
+  setBottomFontStyles(context, fontSize);
+  metrics.push(context.measureText(bottom));
+
+  const lineHeights = metrics.map(
+    (metric) => metric.actualBoundingBoxAscent + metric.actualBoundingBoxDescent
+  );
+  // use the middle line as the reference line for spacing
+  const lineSpacing = lineHeights[1] * LINE_SPACING;
+  const totalContentHeight =
+    lineHeights.reduce((a, b) => a + b) + lineSpacing * 2;
+
+  return {
+    metrics,
+    lineHeights,
+    lineSpacing,
+    totalContentHeight
+  };
+}
+
+function drawMetrics(context, diameter, baselinePosition, metric) {
+  context.strokeStyle = "black";
+  context.beginPath();
+  context.moveTo(0, baselinePosition);
+  context.lineTo(diameter, baselinePosition);
+  context.closePath();
+  context.stroke();
+
+  context.beginPath();
+  context.moveTo(0, baselinePosition - metric.actualBoundingBoxAscent);
+  context.lineTo(diameter, baselinePosition - metric.actualBoundingBoxAscent);
+  context.closePath();
+  context.stroke();
+
+  context.beginPath();
+  context.moveTo(0, baselinePosition + metric.actualBoundingBoxDescent);
+  context.lineTo(diameter, baselinePosition + metric.actualBoundingBoxDescent);
+  context.closePath();
+  context.stroke();
+}
+
+function setTopFontStyles(context, size) {
+  context.font = `${size}px ${notImpact.family}`;
+  context.fillStyle = "#fecbfe";
+}
+
+function setMiddleFontStyles(context, size) {
+  context.font = `${size}px ${chalkduster.family}`;
+  context.fillStyle = "#9898fd";
+}
+
+function setBottomFontStyles(context, size) {
+  context.font = `${size * 1.2}px ${operinaRomano.family}`;
+  context.fillStyle = "#fd3232";
+}
+
   </script>
 </head>
 <body>
