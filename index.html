@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Begone Horny</title>
+  <meta name="description" content="Generate a &quot;begone horny&quot; sticker or emote with a text of your choosing.">
+  <link rel="icon" href="favicon.png">
+  <style>
+    body.dark-mode {
+      background: #37393f;
+      color: #ddd;
+    }
+  </style>
+  <script type="module">
+import { reactive, computed, html, css, Component, register, Ref } from "https://code.okku.dev/destiny-ui/v0.7.0/dist/mod.js";
+
+class AppRoot extends Component {
+  #top = reactive("begone");
+  #middle = reactive("horny");
+  #bottom = reactive("teen");
+  #dimensions = reactive(320);
+  #canvas = new Ref;
+  #href = reactive("");
+  #hold;
+  
+  static styles = css`
+    label {
+      display: block;
+    }
+    
+    canvas {
+      outline: 1px dashed red;
+    }
+  `;
+  
+  template = html`
+    <label>
+      Size: <input type="number" value=${this.#dimensions} /> (128 = emoji, 320 = stickers)
+    </label>
+    <label>
+      <input type="text" value=${this.#top} /> top
+    </label>
+    <label>
+      <input type="text" value=${this.#middle} /> middle
+    </label>
+    <label>
+      <input type="text" value=${this.#bottom} /> bottom
+    </label>
+    <canvas
+      width=${this.#dimensions}
+      height=${this.#dimensions}
+      destiny:ref=${this.#canvas}
+    />
+    <a
+      href=${this.#href}
+      download=${computed`${this.#top}_${this.#middle}_${this.#bottom}.png`}
+    >💾 Save</a>
+  `;
+  
+  async connectedCallback () {
+    const canvas = await this.#canvas;
+    const context = canvas.getContext("2d");
+
+    this.#hold = computed(() => {
+      const diameter = this.#dimensions.value;
+      const radius = diameter / 2;
+      context.clearRect(0, 0, diameter, diameter);
+      context.textAlign = "center";
+
+      // TODO: font should be ???
+      context.font = `${diameter * 0.24}px serif`;
+      context.textBaseline = "top";
+      context.fillStyle = "#fecbfe"
+      context.fillText(
+        this.#top.value.toLocaleUpperCase(),
+        radius, 0,
+      );
+      // TODO: font should be https://de.ffonts.net/Chalkduster.font?text=HORNY
+      context.font = `${diameter * 0.24}px serif`;
+      context.textBaseline = "middle";
+      context.fillStyle = "#9898fd";
+      context.fillText(
+        this.#middle.value.toLocaleUpperCase(),
+        radius, radius,
+      );
+      // TOOD: font should be https://discord.com/channels/172018499005317120/729466633877454869/879462179202564136
+      context.font = `${diameter * 0.24}px serif`;
+      context.textBaseline = "bottom";
+      context.fillStyle = "#fd3232";
+      context.fillText(
+        this.#bottom.value.toLocaleUpperCase(),
+        radius, diameter,
+      );
+      
+      this.#href.value = (
+        canvas
+        .toDataURL("image/png")
+        .replace("image/png", "image/octet-stream")
+      );
+    });
+  }
+}
+
+register(AppRoot);    
+  </script>
+</head>
+<body>
+  <app-root>Loading…</app-root>
+</body>
+</html>
